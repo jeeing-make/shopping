@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'fit-checker-v1';
+const CACHE_VERSION = 'fit-checker-v2';
 const APP_SHELL = [
   './',
   './index.html',

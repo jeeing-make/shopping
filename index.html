@@ -241,6 +241,10 @@ function barColor(v) {
   return 'var(--red)';
 }
 
+function pushNav() {
+  history.pushState({ tab: state.tab, daebun: state.daebun, sobun: state.sobun }, '', '');
+}
+
 function render() {
   const app = document.getElementById('app');
   app.innerHTML = '';
@@ -257,15 +261,15 @@ function render() {
     <button id="tab-check" class="${state.tab === 'check' ? 'active' : ''}">핏 확인</button>
   `;
   app.appendChild(tabs);
-  tabs.querySelector('#tab-input').onclick = () => { state.tab = 'input'; state.daebun = null; state.sobun = null; render(); };
-  tabs.querySelector('#tab-check').onclick = () => { state.tab = 'check'; state.daebun = null; state.sobun = null; render(); };
+  tabs.querySelector('#tab-input').onclick = () => { state.tab = 'input'; state.daebun = null; state.sobun = null; pushNav(); render(); };
+  tabs.querySelector('#tab-check').onclick = () => { state.tab = 'check'; state.daebun = null; state.sobun = null; pushNav(); render(); };
 
   const crumb = document.createElement('div');
   crumb.className = 'crumb';
   if (state.daebun) {
     const back = document.createElement('button');
     back.textContent = state.sobun ? '\u2039 ' + state.daebun : '\u2039 처음으로';
-    back.onclick = () => { if (state.sobun) { state.sobun = null; } else { state.daebun = null; } render(); };
+    back.onclick = () => { history.back(); };
     crumb.appendChild(back);
     if (state.sobun) {
       const arrow = document.createElement('span');
@@ -292,7 +296,7 @@ function renderCategoryPicker(app) {
     const btn = document.createElement('button');
     btn.className = 'pick';
     btn.innerHTML = `<span class="icon-tile">${CATEGORY_EMOJI[cat]}</span><span class="label">${cat}</span>`;
-    btn.onclick = () => { state.daebun = cat; render(); };
+    btn.onclick = () => { state.daebun = cat; pushNav(); render(); };
     grid.appendChild(btn);
   });
   app.appendChild(grid);
@@ -309,7 +313,7 @@ function renderSubcategoryPicker(app) {
     const btn = document.createElement('button');
     btn.className = 'pick';
     btn.innerHTML = `<span class="icon-tile">${SUB_EMOJI[sub] || '\u{1F455}'}</span><span class="label">${sub}</span>`;
-    btn.onclick = () => { state.sobun = sub; render(); };
+    btn.onclick = () => { state.sobun = sub; pushNav(); render(); };
     grid.appendChild(btn);
   });
   app.appendChild(grid);
@@ -539,10 +543,19 @@ async function postAction(action, data) {
 }
 
 (async function init() {
+  history.replaceState({ tab: state.tab, daebun: state.daebun, sobun: state.sobun }, '', '');
   render();
   await loadData();
   render();
 })();
+
+window.addEventListener('popstate', (e) => {
+  const s = e.state || { tab: 'input', daebun: null, sobun: null };
+  state.tab = s.tab;
+  state.daebun = s.daebun;
+  state.sobun = s.sobun;
+  render();
+});
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {

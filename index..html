@@ -1,0 +1,554 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>핏 체커</title>
+<link rel="manifest" href="./manifest.json" />
+<meta name="theme-color" content="#ffffff" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="default" />
+<meta name="apple-mobile-web-app-title" content="핏체커" />
+<link rel="apple-touch-icon" href="./icon-192.png" />
+<link rel="icon" href="./icon-192.png" />
+<style>
+  :root {
+    --page: #ffffff;
+    --card: #ffffff;
+    --tile: #eaf1ff;
+    --border: #eceef2;
+    --text: #16181d;
+    --sub: #7c8291;
+    --muted: #a7acb8;
+    --blue: #2f6bff;
+    --blue-bg: #eaf1ff;
+    --blue-text: #2054d6;
+    --red: #e5484d;
+    --red-bg: #fdecec;
+    --red-text: #ab2a2f;
+    --amber: #c98a0f;
+    --amber-bg: #fbf1de;
+    --track: #eef0f4;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--page);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Pretendard", "Apple SD Gothic Neo", sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  #app { max-width: 480px; margin: 0 auto; padding: 20px 18px 90px; }
+
+  header.top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 18px; }
+  header.top h1 { font-size: 20px; font-weight: 700; margin: 0; letter-spacing: -0.01em; }
+  header.top .badge { font-size: 11px; font-weight: 600; color: var(--blue-text); background: var(--blue-bg); padding: 4px 10px; border-radius: 20px; }
+
+  nav.tabs { display: flex; gap: 6px; margin-bottom: 20px; }
+  nav.tabs button {
+    flex: 1; padding: 11px; border-radius: 10px; border: 1px solid var(--border);
+    background: #ffffff; color: var(--sub); font-size: 14px; font-weight: 600; cursor: pointer;
+  }
+  nav.tabs button.active { background: var(--blue); color: #ffffff; border-color: var(--blue); }
+
+  .crumb { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--muted); margin-bottom: 14px; min-height: 16px; }
+  .crumb button { background: none; border: none; color: var(--blue); font-size: 13px; cursor: pointer; padding: 0; font-weight: 600; }
+
+  .section-label { font-size: 14px; color: var(--text); margin: 0 0 14px; font-weight: 700; }
+
+  .grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px 8px; }
+  .pick { display: flex; flex-direction: column; align-items: center; gap: 8px; background: none; border: none; cursor: pointer; padding: 2px; }
+  .pick .icon-tile {
+    width: 64px; height: 64px; border-radius: 20px; background: var(--tile);
+    display: flex; align-items: center; justify-content: center; font-size: 28px;
+  }
+  .pick .label { font-size: 13px; color: var(--text); font-weight: 600; }
+  .pick:active .icon-tile { background: #d9e6ff; }
+
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 18px 16px; }
+
+  label.field-label { display: block; font-size: 13px; color: var(--sub); margin-bottom: 6px; font-weight: 600; }
+  input[type=text], input[type=number], select {
+    width: 100%; background: #f7f8fa; border: 1px solid var(--border); color: var(--text);
+    border-radius: 10px; padding: 11px 12px; font-size: 15px; margin-bottom: 14px;
+  }
+  select { appearance: none; }
+
+  .field-row { display: flex; gap: 8px; align-items: center; margin-bottom: 10px; }
+  .field-row .fname { width: 52px; font-size: 14px; color: var(--sub); flex-shrink: 0; font-weight: 600; }
+  .field-row input[type=number] { margin-bottom: 0; flex: 1; }
+  .field-row select { margin-bottom: 0; flex: 1.4; }
+
+  button.primary {
+    width: 100%; background: var(--blue); color: #ffffff; border: none;
+    border-radius: 12px; padding: 14px; font-size: 15px; font-weight: 700; cursor: pointer; margin-top: 6px;
+  }
+  button.primary:active { background: #2054d6; }
+
+  .result-item { border-top: 1px solid var(--border); padding-top: 14px; margin-top: 14px; }
+  .result-item:first-child { border-top: none; margin-top: 0; padding-top: 0; }
+  .result-head { display: flex; justify-content: space-between; align-items: center; }
+  .result-head .name { color: var(--sub); font-size: 13px; font-weight: 600; }
+  .result-head .verdict { font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 20px; }
+  .result-value { display: flex; align-items: baseline; gap: 6px; margin-top: 6px; }
+  .result-value .num { font-size: 26px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .result-value .range { color: var(--muted); font-size: 12px; }
+  .bar-wrap { margin-top: 16px; }
+  .bar { position: relative; height: 6px; border-radius: 3px; overflow: visible; display: flex; background: var(--track); }
+  .bar > div:not(.tick) { height: 100%; }
+  .bar .tick { position: absolute; top: -5px; bottom: -5px; width: 2px; background: var(--text); transform: translateX(-1px); border-radius: 1px; }
+  .bar-labels { position: relative; height: 14px; margin-top: 8px; }
+  .bar-labels span { position: absolute; transform: translateX(-50%); font-size: 10px; color: var(--muted); }
+
+  .v-good { color: var(--blue-text); background: var(--blue-bg); }
+  .v-bad { color: var(--red-text); background: var(--red-bg); }
+  .v-warn { color: var(--amber); background: var(--amber-bg); }
+
+  .final { border-top: 1px solid var(--border); padding-top: 16px; margin-top: 16px; display: flex; justify-content: space-between; align-items: center; }
+  .final span:first-child { font-size: 14px; font-weight: 700; }
+  .final .tag { font-size: 13px; font-weight: 700; padding: 5px 14px; border-radius: 20px; }
+
+  .empty { color: var(--muted); font-size: 13px; text-align: center; padding: 30px 0; }
+
+  .history { margin-top: 20px; }
+  .history-title { font-size: 13px; font-weight: 700; color: var(--sub); margin: 0 0 10px; }
+  .history-item { border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; margin-bottom: 8px; }
+  .history-item .h-top { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 6px; }
+  .history-item .h-name { font-size: 14px; font-weight: 700; }
+  .history-item .h-date { font-size: 11px; color: var(--muted); }
+  .history-item .h-fields { display: flex; flex-wrap: wrap; gap: 6px; }
+  .history-item .h-chip { font-size: 11px; padding: 3px 8px; border-radius: 20px; background: #f4f5f8; color: var(--sub); font-weight: 600; }
+  .history-item .h-chip.v-good { background: var(--blue-bg); color: var(--blue-text); }
+  .history-item .h-chip.v-warn { background: var(--amber-bg); color: var(--amber); }
+  .history-item .h-chip.v-bad { background: var(--red-bg); color: var(--red-text); }
+  .history-item .h-memo { font-size: 12px; color: var(--sub); margin-top: 6px; }
+</style>
+</head>
+<body>
+<div id="app"></div>
+
+<script>
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzLKvCA6BtpsUV12MxlTFupvFLipA6k3-tbGY2xMFlKevzOYidrh5eCYlo1AXJix5aU/exec';
+
+const CATEGORIES = {
+  '상의': ['나시', '반팔티', '긴팔티', '반팔셔츠', '긴팔셔츠'],
+  '아우터': ['가디건', '셔츠자켓', '바람막이', '코트', '패딩'],
+  '하의': ['반바지', '긴바지(청바지)', '슬랙스', '레깅스', '스커트']
+};
+
+const FIELD_SETS = {
+  '상의': ['어깨', '가슴', '길이', '팔둘레', '슬리브'],
+  '아우터': ['어깨', '가슴', '길이', '팔둘레', '슬리브'],
+  '하의': ['허리', '엉덩이', '밑위', '기장', '밑단']
+};
+
+const CATEGORY_EMOJI = { '상의': '👕', '아우터': '🧥', '하의': '👖' };
+const SUB_EMOJI = {
+  '나시': '🎽', '반팔티': '👕', '긴팔티': '👕', '반팔셔츠': '👔', '긴팔셔츠': '👔',
+  '가디건': '🧶', '셔츠자켓': '🧥', '바람막이': '🧥', '코트': '🧥', '패딩': '🧥',
+  '반바지': '🩳', '긴바지(청바지)': '👖', '슬랙스': '👖', '레깅스': '👖', '스커트': '👗'
+};
+
+const SATISFACTION_OPTIONS = ['안맞음', '맞는데 불만족', '만족', '너무큼'];
+
+const DEFAULT_CRITERIA = {
+  '반바지': { '허리': [37, 39, 42], '엉덩이': [105, 110, 125], '밑위': [30, 32, 34], '기장': [100, 102, 108], '밑단': [28, 30, 33] },
+  '긴바지(청바지)': { '허리': [37, 39, 42], '엉덩이': [105, 110, 125], '밑위': [30, 32, 34], '기장': [100, 102, 108], '밑단': [28, 30, 33] },
+  '슬랙스': { '허리': [37, 39, 42], '엉덩이': [105, 110, 125], '밑위': [30, 32, 34], '기장': [100, 102, 108], '밑단': [28, 30, 33] },
+  '레깅스': { '허리': [37, 39, 42], '엉덩이': [105, 110, 125], '밑위': [30, 32, 34], '기장': [100, 102, 108], '밑단': [28, 30, 33] },
+  '스커트': { '허리': [37, 39, 42], '엉덩이': [105, 110, 125], '밑위': [30, 32, 34], '기장': [100, 102, 108], '밑단': [28, 30, 33] }
+};
+
+function checkHardRule(daebun, sobun, field, value) {
+  if ((daebun === '상의' || daebun === '아우터') && field === '가슴' && value <= 120) return '안맞음';
+  return null;
+}
+
+let state = { tab: 'input', daebun: null, sobun: null, clothes: [], criteria: [] };
+
+async function loadData() {
+  if (SCRIPT_URL.indexOf('YOUR_APPS_SCRIPT') === 0) return;
+  try {
+    const res = await fetch(SCRIPT_URL);
+    const json = await res.json();
+    state.clothes = json.clothes || [];
+    state.criteria = json.criteria || [];
+  } catch (err) { console.error('load failed', err); }
+}
+
+function getCriteria(sobun, field) {
+  const row = state.criteria.find(c => c['소분류'] === sobun && c['항목'] === field);
+  if (row && row['최소'] !== '' && row['최적하한'] !== '' && row['최적상한'] !== '') {
+    return [Number(row['최소']), Number(row['최적하한']), Number(row['최적상한'])];
+  }
+  const fallback = DEFAULT_CRITERIA[sobun];
+  return fallback && fallback[field] ? fallback[field] : null;
+}
+
+function judge(daebun, sobun, field, value) {
+  const hard = checkHardRule(daebun, sobun, field, value);
+  if (hard) return { verdict: hard, range: null };
+  const range = getCriteria(sobun, field);
+  if (!range) return { verdict: null, range: null };
+  const [min, optLow, optHigh] = range;
+  let verdict;
+  if (value < min) verdict = '안맞음';
+  else if (value < optLow) verdict = '맞는데 불만족';
+  else if (value <= optHigh) verdict = '만족';
+  else verdict = '너무큼';
+  return { verdict, range };
+}
+
+function overallVerdict(verdicts) {
+  if (verdicts.includes('안맞음')) return '안맞음';
+  if (verdicts.includes('너무큼')) return '너무큼';
+  if (verdicts.includes('맞는데 불만족')) return '맞는데 불만족';
+  return '만족';
+}
+
+function tone(v) {
+  if (v === '만족') return 'v-good';
+  if (v === '맞는데 불만족') return 'v-warn';
+  return 'v-bad';
+}
+function computeScale(min, optLow, optHigh) {
+  const step1 = optLow - min;
+  const step2 = optHigh - optLow;
+  const p0 = round1(min - step1);
+  const p1 = min;
+  const p2 = optLow;
+  const p3 = optHigh;
+  const p4 = round1(optHigh + step2);
+  return { p0, p1, p2, p3, p4 };
+}
+function round1(n) { return Math.round(n * 10) / 10; }
+function markerPercent(value, scale) {
+  const { p0, p1, p2, p3, p4 } = scale;
+  const segs = [[p0, p1, 0, 25], [p1, p2, 25, 50], [p2, p3, 50, 75], [p3, p4, 75, 100]];
+  const v = Math.max(p0, Math.min(p4, value));
+  for (const [a, b, pa, pb] of segs) {
+    if (v >= a && v <= b) {
+      const ratio = b === a ? 0 : (v - a) / (b - a);
+      return pa + ratio * (pb - pa);
+    }
+  }
+  return 50;
+}
+function barColor(v) {
+  if (v === '만족') return 'var(--blue)';
+  if (v === '맞는데 불만족') return 'var(--amber)';
+  return 'var(--red)';
+}
+
+function render() {
+  const app = document.getElementById('app');
+  app.innerHTML = '';
+
+  const header = document.createElement('header');
+  header.className = 'top';
+  header.innerHTML = `<h1>핏 체커</h1><span class="badge">지잉 옷 사이즈</span>`;
+  app.appendChild(header);
+
+  const tabs = document.createElement('nav');
+  tabs.className = 'tabs';
+  tabs.innerHTML = `
+    <button id="tab-input" class="${state.tab === 'input' ? 'active' : ''}">구매 기록</button>
+    <button id="tab-check" class="${state.tab === 'check' ? 'active' : ''}">핏 확인</button>
+  `;
+  app.appendChild(tabs);
+  tabs.querySelector('#tab-input').onclick = () => { state.tab = 'input'; state.daebun = null; state.sobun = null; render(); };
+  tabs.querySelector('#tab-check').onclick = () => { state.tab = 'check'; state.daebun = null; state.sobun = null; render(); };
+
+  const crumb = document.createElement('div');
+  crumb.className = 'crumb';
+  if (state.daebun) {
+    const back = document.createElement('button');
+    back.textContent = state.sobun ? '\u2039 ' + state.daebun : '\u2039 처음으로';
+    back.onclick = () => { if (state.sobun) { state.sobun = null; } else { state.daebun = null; } render(); };
+    crumb.appendChild(back);
+    if (state.sobun) {
+      const arrow = document.createElement('span');
+      arrow.textContent = '/ ' + state.sobun;
+      crumb.appendChild(arrow);
+    }
+  }
+  app.appendChild(crumb);
+
+  if (!state.daebun) renderCategoryPicker(app);
+  else if (!state.sobun) renderSubcategoryPicker(app);
+  else if (state.tab === 'input') renderInputForm(app);
+  else renderCheckForm(app);
+}
+
+function renderCategoryPicker(app) {
+  const label = document.createElement('p');
+  label.className = 'section-label';
+  label.textContent = '대분류 선택';
+  app.appendChild(label);
+  const grid = document.createElement('div');
+  grid.className = 'grid3';
+  Object.keys(CATEGORIES).forEach(cat => {
+    const btn = document.createElement('button');
+    btn.className = 'pick';
+    btn.innerHTML = `<span class="icon-tile">${CATEGORY_EMOJI[cat]}</span><span class="label">${cat}</span>`;
+    btn.onclick = () => { state.daebun = cat; render(); };
+    grid.appendChild(btn);
+  });
+  app.appendChild(grid);
+}
+
+function renderSubcategoryPicker(app) {
+  const label = document.createElement('p');
+  label.className = 'section-label';
+  label.textContent = '소분류 선택 \u2014 ' + state.daebun;
+  app.appendChild(label);
+  const grid = document.createElement('div');
+  grid.className = 'grid3';
+  CATEGORIES[state.daebun].forEach(sub => {
+    const btn = document.createElement('button');
+    btn.className = 'pick';
+    btn.innerHTML = `<span class="icon-tile">${SUB_EMOJI[sub] || '\u{1F455}'}</span><span class="label">${sub}</span>`;
+    btn.onclick = () => { state.sobun = sub; render(); };
+    grid.appendChild(btn);
+  });
+  app.appendChild(grid);
+}
+
+function renderInputForm(app) {
+  const fields = FIELD_SETS[state.daebun];
+  const card = document.createElement('div');
+  card.className = 'card';
+
+  const nameLabel = document.createElement('label');
+  nameLabel.className = 'field-label';
+  nameLabel.textContent = '제품명 (선택)';
+  card.appendChild(nameLabel);
+  const nameInput = document.createElement('input');
+  nameInput.type = 'text';
+  nameInput.placeholder = '예: 유니클로 오버셔츠';
+  card.appendChild(nameInput);
+
+  const fieldInputs = {};
+  fields.forEach(f => {
+    const row = document.createElement('div');
+    row.className = 'field-row';
+    row.innerHTML = `
+      <span class="fname">${f}</span>
+      <input type="number" step="0.1" placeholder="cm" />
+      <select>
+        <option value="">만족도</option>
+        ${SATISFACTION_OPTIONS.map(o => `<option value="${o}">${o}</option>`).join('')}
+      </select>
+    `;
+    card.appendChild(row);
+    fieldInputs[f] = { value: row.querySelector('input'), sat: row.querySelector('select') };
+  });
+
+  const memoLabel = document.createElement('label');
+  memoLabel.className = 'field-label';
+  memoLabel.textContent = '메모 (선택)';
+  card.appendChild(memoLabel);
+  const memoInput = document.createElement('input');
+  memoInput.type = 'text';
+  card.appendChild(memoInput);
+
+  const saveBtn = document.createElement('button');
+  saveBtn.className = 'primary';
+  saveBtn.textContent = '저장하기';
+  saveBtn.onclick = async () => {
+    const data = { '대분류': state.daebun, '소분류': state.sobun, '제품명': nameInput.value, '메모': memoInput.value };
+    fields.forEach(f => { data[f] = fieldInputs[f].value.value; data[f + '만족'] = fieldInputs[f].sat.value; });
+    saveBtn.textContent = '저장 중...';
+    saveBtn.disabled = true;
+    try {
+      await postAction('saveClothing', data);
+      state.clothes.push(Object.assign({ '날짜': new Date().toISOString().slice(0, 10) }, data));
+      render();
+    } catch (err) {
+      alert('저장에 실패했어. Apps Script URL 설정을 확인해줘.');
+      saveBtn.textContent = '저장하기';
+      saveBtn.disabled = false;
+    }
+  };
+  card.appendChild(saveBtn);
+  app.appendChild(card);
+
+  renderHistory(app, fields);
+}
+
+function renderHistory(app, fields) {
+  const items = state.clothes
+    .filter(c => c['대분류'] === state.daebun && c['소분류'] === state.sobun)
+    .sort((a, b) => (b['날짜'] || '').localeCompare(a['날짜'] || ''));
+
+  const wrap = document.createElement('div');
+  wrap.className = 'history';
+  const title = document.createElement('p');
+  title.className = 'history-title';
+  title.textContent = `이전 기록 (${items.length})`;
+  wrap.appendChild(title);
+
+  if (items.length === 0) {
+    wrap.innerHTML += '<div class="empty">아직 기록이 없어.</div>';
+    app.appendChild(wrap);
+    return;
+  }
+
+  items.forEach(it => {
+    const el = document.createElement('div');
+    el.className = 'history-item';
+    const chips = fields
+      .filter(f => it[f] !== '' && it[f] !== undefined)
+      .map(f => {
+        const sat = it[f + '만족'];
+        const cls = sat === '만족' ? 'v-good' : sat === '맞는데 불만족' ? 'v-warn' : (sat === '안맞음' || sat === '너무큼') ? 'v-bad' : '';
+        return `<span class="h-chip ${cls}">${f} ${it[f]}${sat ? ' \u00b7 ' + sat : ''}</span>`;
+      })
+      .join('');
+    el.innerHTML = `
+      <div class="h-top">
+        <span class="h-name">${it['제품명'] || state.sobun}</span>
+        <span class="h-date">${it['날짜'] || ''}</span>
+      </div>
+      <div class="h-fields">${chips}</div>
+      ${it['메모'] ? `<div class="h-memo">${it['메모']}</div>` : ''}
+    `;
+    wrap.appendChild(el);
+  });
+  app.appendChild(wrap);
+}
+
+function renderCheckForm(app) {
+  const fields = FIELD_SETS[state.daebun];
+  const card = document.createElement('div');
+  card.className = 'card';
+
+  const label = document.createElement('p');
+  label.className = 'section-label';
+  label.style.margin = '0 0 12px';
+  label.textContent = '값 입력 \u2014 ' + state.sobun;
+  card.appendChild(label);
+
+  const fieldInputs = {};
+  fields.forEach(f => {
+    const row = document.createElement('div');
+    row.className = 'field-row';
+    row.innerHTML = `<span class="fname">${f}</span><input type="number" step="0.1" placeholder="cm" style="flex:1.4" />`;
+    card.appendChild(row);
+    fieldInputs[f] = row.querySelector('input');
+  });
+
+  const checkBtn = document.createElement('button');
+  checkBtn.className = 'primary';
+  checkBtn.textContent = '확인하기';
+  card.appendChild(checkBtn);
+
+  const resultBox = document.createElement('div');
+  app.appendChild(card);
+  app.appendChild(resultBox);
+
+  checkBtn.onclick = () => {
+    const results = [];
+    fields.forEach(f => {
+      const raw = fieldInputs[f].value;
+      if (raw === '') return;
+      const value = Number(raw);
+      const { verdict, range } = judge(state.daebun, state.sobun, f, value);
+      results.push({ field: f, value, verdict, range });
+    });
+    renderResults(resultBox, results);
+  };
+}
+
+function renderResults(box, results) {
+  box.innerHTML = '';
+  if (results.length === 0) {
+    box.innerHTML = '<div class="empty">값을 하나 이상 입력해줘.</div>';
+    return;
+  }
+  const card = document.createElement('div');
+  card.className = 'card';
+  card.style.marginTop = '14px';
+
+  results.forEach(r => {
+    const item = document.createElement('div');
+    item.className = 'result-item';
+    if (!r.verdict) {
+      item.innerHTML = `
+        <div class="result-head"><span class="name">${r.field}</span><span class="range">기준값 없음</span></div>
+        <div class="result-value"><span class="num">${r.value}</span><span class="range">cm</span></div>
+      `;
+    } else {
+      const [min, optLow, optHigh] = r.range || [null, null, null];
+      const c = barColor(r.verdict);
+      const segIdx = ['안맞음', '맞는데 불만족', '만족', '너무큼'].indexOf(r.verdict);
+      const flexes = [1, 1, 1.5, 1];
+      const segs = flexes.map((f, i) => `<div style="flex:${f};background:${i === segIdx ? c : 'var(--track)'}"></div>`).join('');
+      const rangeText = r.range ? `최적 ${optLow}\u2013${optHigh}` : '';
+      let barBlock = `<div class="bar">${segs}</div>`;
+      if (r.range) {
+        const scale = computeScale(min, optLow, optHigh);
+        const pct = markerPercent(r.value, scale);
+        barBlock = `
+          <div class="bar-wrap">
+            <div class="bar">${segs}<div class="tick" style="left:${pct}%"></div></div>
+            <div class="bar-labels">
+              <span style="left:0%">${scale.p0}</span>
+              <span style="left:25%">${scale.p1}</span>
+              <span style="left:50%">${scale.p2}</span>
+              <span style="left:75%">${scale.p3}</span>
+            </div>
+          </div>
+        `;
+      }
+      item.innerHTML = `
+        <div class="result-head">
+          <span class="name">${r.field}</span>
+          <span class="verdict ${tone(r.verdict)}">${r.verdict}</span>
+        </div>
+        <div class="result-value">
+          <span class="num">${r.value}</span>
+          <span class="range">cm ${rangeText ? '\u00b7 ' + rangeText : ''}</span>
+        </div>
+        ${barBlock}
+      `;
+    }
+    card.appendChild(item);
+  });
+
+  const verdicts = results.filter(r => r.verdict).map(r => r.verdict);
+  if (verdicts.length > 0) {
+    const final = overallVerdict(verdicts);
+    const finalRow = document.createElement('div');
+    finalRow.className = 'final';
+    finalRow.innerHTML = `<span>종합 판정</span><span class="tag ${tone(final)}">${final}</span>`;
+    card.appendChild(finalRow);
+  }
+  box.appendChild(card);
+}
+
+async function postAction(action, data) {
+  if (SCRIPT_URL.indexOf('YOUR_APPS_SCRIPT') === 0) throw new Error('SCRIPT_URL not configured');
+  const res = await fetch(SCRIPT_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    body: JSON.stringify({ action, data })
+  });
+  return res.json();
+}
+
+(async function init() {
+  render();
+  await loadData();
+  render();
+})();
+
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js').catch((err) => console.error('SW 등록 실패', err));
+  });
+}
+</script>
+</body>
+</html>

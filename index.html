@@ -132,6 +132,17 @@
   .history-item .h-link img { width: 24px; height: 24px; border-radius: 6px; }
   .history-item .h-link span { font-size: 10px; color: var(--sub); text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; width: 100%; }
   .history-item .h-memo-text { font-size: 12px; color: var(--sub); margin-top: 6px; }
+  .history-item .h-actions { display: flex; gap: 6px; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border); }
+  .history-item .h-actions button {
+    flex: 1; background: #f7f8fa; border: none; border-radius: 8px; padding: 7px; font-size: 12px;
+    font-weight: 600; color: var(--sub); cursor: pointer;
+  }
+  .history-item .h-actions button.h-delete { color: var(--red-text); }
+  .editing-badge {
+    display: flex; justify-content: space-between; align-items: center; background: var(--blue-bg);
+    color: var(--blue-text); font-size: 12px; font-weight: 700; padding: 8px 12px; border-radius: 10px; margin-bottom: 12px;
+  }
+  .editing-badge button { background: none; border: none; color: var(--blue-text); font-size: 12px; font-weight: 700; cursor: pointer; }
 </style>
 </head>
 <body>
@@ -174,7 +185,7 @@ function checkHardRule(daebun, sobun, field, value) {
   return null;
 }
 
-let state = { tab: 'input', daebun: null, sobun: null, clothes: [], criteria: [] };
+let state = { tab: 'input', daebun: null, sobun: null, clothes: [], criteria: [], editingId: null };
 
 async function loadData() {
   if (SCRIPT_URL.indexOf('YOUR_APPS_SCRIPT') === 0) return;
@@ -344,6 +355,16 @@ function renderSubcategoryPicker(app) {
 
 function renderInputForm(app) {
   const fields = FIELD_SETS[state.daebun];
+  const editing = state.editingId ? state.clothes.find(c => c['id'] === state.editingId) : null;
+
+  if (editing) {
+    const badge = document.createElement('div');
+    badge.className = 'editing-badge';
+    badge.innerHTML = `<span>\u270f\ufe0f ${editing['제품명'] || state.sobun} \uc218\uc815 \uc911</span><button>\ucde8\uc18c</button>`;
+    badge.querySelector('button').onclick = () => { state.editingId = null; render(); };
+    app.appendChild(badge);
+  }
+
   const card = document.createElement('div');
   card.className = 'card';
 
@@ -354,6 +375,7 @@ function renderInputForm(app) {
   const nameInput = document.createElement('input');
   nameInput.type = 'text';
   nameInput.placeholder = '예: 유니클로 오버셔츠';
+  if (editing) nameInput.value = editing['제품명'] || '';
   card.appendChild(nameInput);
 
   const fieldInputs = {};
@@ -369,7 +391,13 @@ function renderInputForm(app) {
       </select>
     `;
     card.appendChild(row);
-    fieldInputs[f] = { value: row.querySelector('input'), sat: row.querySelector('select') };
+    const valueInput = row.querySelector('input');
+    const satSelect = row.querySelector('select');
+    if (editing) {
+      if (editing[f] !== '' && editing[f] !== undefined) valueInput.value = editing[f];
+      if (editing[f + '만족']) satSelect.value = editing[f + '만족'];
+    }
+    fieldInputs[f] = { value: valueInput, sat: satSelect };
   });
 
   const memoLabel = document.createElement('label');
@@ -378,23 +406,33 @@ function renderInputForm(app) {
   card.appendChild(memoLabel);
   const memoInput = document.createElement('input');
   memoInput.type = 'text';
+  if (editing) memoInput.value = editing['메모'] || '';
   card.appendChild(memoInput);
 
   const saveBtn = document.createElement('button');
   saveBtn.className = 'primary';
-  saveBtn.textContent = '저장하기';
+  saveBtn.textContent = editing ? '수정 저장하기' : '저장하기';
   saveBtn.onclick = async () => {
     const data = { '대분류': state.daebun, '소분류': state.sobun, '제품명': nameInput.value, '메모': memoInput.value };
     fields.forEach(f => { data[f] = fieldInputs[f].value.value; data[f + '만족'] = fieldInputs[f].sat.value; });
     saveBtn.textContent = '저장 중...';
     saveBtn.disabled = true;
     try {
-      await postAction('saveClothing', data);
-      state.clothes.push(Object.assign({ '날짜': new Date().toISOString().slice(0, 10) }, data));
+      if (editing) {
+        data['id'] = editing['id'];
+        data['날짜'] = editing['날짜'];
+        await postAction('updateClothing', data);
+        const idx = state.clothes.findIndex(c => c['id'] === editing['id']);
+        if (idx >= 0) state.clothes[idx] = data;
+        state.editingId = null;
+      } else {
+        await postAction('saveClothing', data);
+        state.clothes.push(Object.assign({ '날짜': new Date().toISOString().slice(0, 10) }, data));
+      }
       render();
     } catch (err) {
       alert('저장에 실패했어. Apps Script URL 설정을 확인해줘.');
-      saveBtn.textContent = '저장하기';
+      saveBtn.textContent = editing ? '수정 저장하기' : '저장하기';
       saveBtn.disabled = false;
     }
   };
@@ -438,15 +476,17 @@ function renderHistory(app, fields) {
     const isUrl = /^https?:\/\//i.test(memo);
     let linkBlock = '';
     let memoBlock = '';
+    let linkHref = '';
     if (isUrl) {
       try {
         const host = new URL(memo).hostname.replace(/^www\./, '');
         const favicon = `https://www.google.com/s2/favicons?sz=64&domain=${host}`;
+        linkHref = memo;
         linkBlock = `
-          <a class="h-link" href="${memo}" target="_blank" rel="noopener">
+          <button type="button" class="h-link" data-href="${encodeURI(memo)}">
             <img src="${favicon}" alt="" />
             <span>${host}</span>
-          </a>
+          </button>
         `;
       } catch (e) { memoBlock = `<div class="h-memo-text">${memo}</div>`; }
     } else if (memo) {
@@ -463,7 +503,32 @@ function renderHistory(app, fields) {
         ${linkBlock}
       </div>
       ${memoBlock}
+      <div class="h-actions">
+        <button type="button" class="h-edit">수정</button>
+        <button type="button" class="h-delete">삭제</button>
+      </div>
     `;
+
+    const linkEl = el.querySelector('.h-link');
+    if (linkEl) {
+      linkEl.onclick = () => {
+        const url = linkEl.dataset.href;
+        const w = window.open(url, '_blank', 'noopener');
+        if (!w) location.href = url;
+      };
+    }
+    el.querySelector('.h-edit').onclick = () => { state.editingId = it['id']; window.scrollTo(0, 0); render(); };
+    el.querySelector('.h-delete').onclick = async () => {
+      if (!confirm('이 기록을 삭제할까?')) return;
+      try {
+        await postAction('deleteClothing', { id: it['id'] });
+        state.clothes = state.clothes.filter(c => c['id'] !== it['id']);
+        render();
+      } catch (err) {
+        alert('삭제에 실패했어.');
+      }
+    };
+
     wrap.appendChild(el);
   });
   app.appendChild(wrap);

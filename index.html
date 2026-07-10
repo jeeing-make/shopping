@@ -250,8 +250,22 @@ function barColor(v) {
   return 'var(--red)';
 }
 
+function navHash() {
+  const t = encodeURIComponent(state.tab);
+  const d = state.daebun ? encodeURIComponent(state.daebun) : '';
+  const s = state.sobun ? encodeURIComponent(state.sobun) : '';
+  if (d && s) return '#' + t + '-' + d + '-' + s;
+  if (d) return '#' + t + '-' + d;
+  return '#' + t;
+}
 function pushNav() {
-  history.pushState({ tab: state.tab, daebun: state.daebun, sobun: state.sobun }, '', '');
+  const hash = navHash();
+  history.pushState({ tab: state.tab, daebun: state.daebun, sobun: state.sobun }, '', hash);
+}
+function parseHash(hash) {
+  const parts = (hash || '').replace('#', '').split('-').map(decodeURIComponent);
+  const tab = parts[0] === 'check' ? 'check' : 'input';
+  return { tab, daebun: parts[1] || null, sobun: parts[2] || null };
 }
 
 function render() {
@@ -580,17 +594,18 @@ async function postAction(action, data) {
 }
 
 (async function init() {
-  history.replaceState({ tab: state.tab, daebun: state.daebun, sobun: state.sobun }, '', '');
+  history.replaceState({ tab: state.tab, daebun: state.daebun, sobun: state.sobun }, '', navHash());
   render();
   await loadData();
   render();
 })();
 
 window.addEventListener('popstate', (e) => {
-  const s = e.state || { tab: 'input', daebun: null, sobun: null };
-  state.tab = s.tab;
-  state.daebun = s.daebun;
-  state.sobun = s.sobun;
+  const fromState = e.state;
+  const parsed = fromState ? fromState : parseHash(location.hash);
+  state.tab = parsed.tab || 'input';
+  state.daebun = parsed.daebun || null;
+  state.sobun = parsed.sobun || null;
   render();
 });
 

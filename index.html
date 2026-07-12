@@ -151,23 +151,35 @@
 <script>
 const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzLKvCA6BtpsUV12MxlTFupvFLipA6k3-tbGY2xMFlKevzOYidrh5eCYlo1AXJix5aU/exec';
 
+const SEASONS = ['여름', '겨울'];
+const SEASON_EMOJI = { '여름': '☀️', '겨울': '❄️' };
+
 const CATEGORIES = {
-  '상의': ['나시', '반팔티', '긴팔티', '반팔셔츠', '긴팔셔츠'],
-  '아우터': ['가디건', '셔츠자켓', '바람막이', '코트', '패딩'],
-  '하의': ['반바지', '긴바지(청바지)', '슬랙스', '레깅스', '스커트']
+  '상의': ['나시', '반팔티', '긴팔티', '반팔셔츠', '긴팔셔츠', '맨투맨', '니트', '후드티'],
+  '아우터': ['가디건', '셔츠자켓', '바람막이', '코트', '패딩', '후드집업'],
+  '하의': ['반바지', '긴바지(청바지)', '슬랙스', '레깅스', '스커트'],
+  '원피스': ['미니원피스', '미디원피스', '롱원피스'],
+  '모자': ['볼캡', '버킷햇', '니트비니'],
+  '신발': ['앵클부츠', '롱부츠', '워커부츠']
 };
 
 const FIELD_SETS = {
-  '상의': ['어깨', '가슴', '길이', '팔둘레', '슬리브'],
-  '아우터': ['어깨', '가슴', '길이', '팔둘레', '슬리브'],
-  '하의': ['허리', '엉덩이', '밑위', '기장', '밑단']
+  '상의': ['어깨', '가슴', '길이', '팔둘레', '슬리브', '밑단'],
+  '아우터': ['어깨', '가슴', '길이', '팔둘레', '슬리브', '밑단'],
+  '하의': ['허리', '엉덩이', '허벅지', '밑위', '기장', '밑단'],
+  '원피스': ['어깨', '가슴', '허리', '엉덩이', '기장', '밑단'],
+  '모자': ['머리둘레', '챙길이'],
+  '신발': ['발사이즈', '발볼', '종아리둘레', '굽높이', '목높이']
 };
 
-const CATEGORY_EMOJI = { '상의': '👕', '아우터': '🧥', '하의': '👖' };
+const CATEGORY_EMOJI = { '상의': '👕', '아우터': '🧥', '하의': '👖', '원피스': '👗', '모자': '🧢', '신발': '👢' };
 const SUB_EMOJI = {
-  '나시': '🎽', '반팔티': '👕', '긴팔티': '👕', '반팔셔츠': '👔', '긴팔셔츠': '👔',
-  '가디건': '🧶', '셔츠자켓': '🧥', '바람막이': '🧥', '코트': '🧥', '패딩': '🧥',
-  '반바지': '🩳', '긴바지(청바지)': '👖', '슬랙스': '👖', '레깅스': '👖', '스커트': '👗'
+  '나시': '🎽', '반팔티': '👕', '긴팔티': '👕', '반팔셔츠': '👔', '긴팔셔츠': '👔', '맨투맨': '👕', '니트': '🧶', '후드티': '👕',
+  '가디건': '🧶', '셔츠자켓': '🧥', '바람막이': '🧥', '코트': '🧥', '패딩': '🧥', '후드집업': '🧥',
+  '반바지': '🩳', '긴바지(청바지)': '👖', '슬랙스': '👖', '레깅스': '👖', '스커트': '👗',
+  '미니원피스': '👗', '미디원피스': '👗', '롱원피스': '👗',
+  '볼캡': '🧢', '버킷햇': '👒', '니트비니': '🧢',
+  '앵클부츠': '👢', '롱부츠': '👢', '워커부츠': '👢'
 };
 
 const SATISFACTION_OPTIONS = ['안맞음', '맞는데 불만족', '만족', '너무큼'];
@@ -181,11 +193,11 @@ const DEFAULT_CRITERIA = {
 };
 
 function checkHardRule(daebun, sobun, field, value) {
-  if ((daebun === '상의' || daebun === '아우터') && field === '가슴' && value <= 120) return '안맞음';
+  if ((daebun === '상의' || daebun === '아우터' || daebun === '원피스') && field === '가슴' && value <= 120) return '안맞음';
   return null;
 }
 
-let state = { tab: 'input', daebun: null, sobun: null, clothes: [], criteria: [], editingId: null };
+let state = { tab: 'input', season: null, daebun: null, sobun: null, clothes: [], criteria: [], editingId: null };
 
 async function loadData() {
   if (SCRIPT_URL.indexOf('YOUR_APPS_SCRIPT') === 0) return;
@@ -197,8 +209,9 @@ async function loadData() {
   } catch (err) { console.error('load failed', err); }
 }
 
-function getCriteria(sobun, field) {
-  const row = state.criteria.find(c => c['소분류'] === sobun && c['항목'] === field);
+function getCriteria(season, sobun, field) {
+  let row = state.criteria.find(c => c['소분류'] === sobun && c['항목'] === field && c['계절'] === season);
+  if (!row) row = state.criteria.find(c => c['소분류'] === sobun && c['항목'] === field && !c['계절']);
   if (row && row['최소'] !== '' && row['최적하한'] !== '' && row['최적상한'] !== '') {
     return [Number(row['최소']), Number(row['최적하한']), Number(row['최적상한'])];
   }
@@ -206,10 +219,10 @@ function getCriteria(sobun, field) {
   return fallback && fallback[field] ? fallback[field] : null;
 }
 
-function judge(daebun, sobun, field, value) {
+function judge(daebun, sobun, field, value, season) {
   const hard = checkHardRule(daebun, sobun, field, value);
   if (hard) return { verdict: hard, range: null };
-  const range = getCriteria(sobun, field);
+  const range = getCriteria(season, sobun, field);
   if (!range) return { verdict: null, range: null };
   const [min, optLow, optHigh] = range;
   let verdict;
@@ -263,20 +276,23 @@ function barColor(v) {
 
 function navHash() {
   const t = encodeURIComponent(state.tab);
+  const se = state.season ? encodeURIComponent(state.season) : '';
   const d = state.daebun ? encodeURIComponent(state.daebun) : '';
   const s = state.sobun ? encodeURIComponent(state.sobun) : '';
-  if (d && s) return '#' + t + '-' + d + '-' + s;
-  if (d) return '#' + t + '-' + d;
-  return '#' + t;
+  let parts = [t];
+  if (se) parts.push(se);
+  if (d) parts.push(d);
+  if (s) parts.push(s);
+  return '#' + parts.join('-');
 }
 function pushNav() {
   const hash = navHash();
-  history.pushState({ tab: state.tab, daebun: state.daebun, sobun: state.sobun }, '', hash);
+  history.pushState({ tab: state.tab, season: state.season, daebun: state.daebun, sobun: state.sobun }, '', hash);
 }
 function parseHash(hash) {
   const parts = (hash || '').replace('#', '').split('-').map(decodeURIComponent);
   const tab = parts[0] === 'check' ? 'check' : 'input';
-  return { tab, daebun: parts[1] || null, sobun: parts[2] || null };
+  return { tab, season: parts[1] || null, daebun: parts[2] || null, sobun: parts[3] || null };
 }
 
 function render() {
@@ -295,28 +311,47 @@ function render() {
     <button id="tab-check" class="${state.tab === 'check' ? 'active' : ''}">핏 확인</button>
   `;
   app.appendChild(tabs);
-  tabs.querySelector('#tab-input').onclick = () => { state.tab = 'input'; state.daebun = null; state.sobun = null; pushNav(); render(); };
-  tabs.querySelector('#tab-check').onclick = () => { state.tab = 'check'; state.daebun = null; state.sobun = null; pushNav(); render(); };
+  tabs.querySelector('#tab-input').onclick = () => { state.tab = 'input'; state.season = null; state.daebun = null; state.sobun = null; pushNav(); render(); };
+  tabs.querySelector('#tab-check').onclick = () => { state.tab = 'check'; state.season = null; state.daebun = null; state.sobun = null; pushNav(); render(); };
 
   const crumb = document.createElement('div');
   crumb.className = 'crumb';
-  if (state.daebun) {
+  if (state.season) {
     const back = document.createElement('button');
-    back.textContent = state.sobun ? '\u2039 ' + state.daebun : '\u2039 처음으로';
+    back.textContent = state.daebun ? '\u2039 ' + (state.sobun ? state.daebun : state.season) : '\u2039 처음으로';
     back.onclick = () => { history.back(); };
     crumb.appendChild(back);
-    if (state.sobun) {
-      const arrow = document.createElement('span');
-      arrow.textContent = '/ ' + state.sobun;
-      crumb.appendChild(arrow);
-    }
+    const trail = [state.season];
+    if (state.daebun) trail.push(state.daebun);
+    if (state.sobun) trail.push(state.sobun);
+    const arrow = document.createElement('span');
+    arrow.textContent = '/ ' + trail.slice(1).join(' / ');
+    if (trail.length > 1) crumb.appendChild(arrow);
   }
   app.appendChild(crumb);
 
-  if (!state.daebun) renderCategoryPicker(app);
+  if (!state.season) renderSeasonPicker(app);
+  else if (!state.daebun) renderCategoryPicker(app);
   else if (!state.sobun) renderSubcategoryPicker(app);
   else if (state.tab === 'input') renderInputForm(app);
   else renderCheckForm(app);
+}
+
+function renderSeasonPicker(app) {
+  const label = document.createElement('p');
+  label.className = 'section-label';
+  label.textContent = '계절 선택';
+  app.appendChild(label);
+  const grid = document.createElement('div');
+  grid.className = 'grid3';
+  SEASONS.forEach(se => {
+    const btn = document.createElement('button');
+    btn.className = 'pick';
+    btn.innerHTML = `<span class="icon-tile">${SEASON_EMOJI[se]}</span><span class="label">${se}</span>`;
+    btn.onclick = () => { state.season = se; pushNav(); render(); };
+    grid.appendChild(btn);
+  });
+  app.appendChild(grid);
 }
 
 function renderCategoryPicker(app) {
@@ -413,7 +448,7 @@ function renderInputForm(app) {
   saveBtn.className = 'primary';
   saveBtn.textContent = editing ? '수정 저장하기' : '저장하기';
   saveBtn.onclick = async () => {
-    const data = { '대분류': state.daebun, '소분류': state.sobun, '제품명': nameInput.value, '메모': memoInput.value };
+    const data = { '계절': state.season, '대분류': state.daebun, '소분류': state.sobun, '제품명': nameInput.value, '메모': memoInput.value };
     fields.forEach(f => { data[f] = fieldInputs[f].value.value; data[f + '만족'] = fieldInputs[f].sat.value; });
     saveBtn.textContent = '저장 중...';
     saveBtn.disabled = true;
@@ -444,7 +479,7 @@ function renderInputForm(app) {
 
 function renderHistory(app, fields) {
   const items = state.clothes
-    .filter(c => c['대분류'] === state.daebun && c['소분류'] === state.sobun)
+    .filter(c => c['계절'] === state.season && c['대분류'] === state.daebun && c['소분류'] === state.sobun)
     .sort((a, b) => (b['날짜'] || '').localeCompare(a['날짜'] || ''));
 
   const wrap = document.createElement('div');
@@ -574,7 +609,7 @@ function renderCheckForm(app) {
       const raw = fieldInputs[f].value;
       if (raw === '') return;
       const value = Number(raw);
-      const { verdict, range } = judge(state.daebun, state.sobun, f, value);
+      const { verdict, range } = judge(state.daebun, state.sobun, f, value, state.season);
       results.push({ field: f, value, verdict, range });
     });
     renderResults(resultBox, results);
@@ -659,7 +694,7 @@ async function postAction(action, data) {
 }
 
 (async function init() {
-  history.replaceState({ tab: state.tab, daebun: state.daebun, sobun: state.sobun }, '', navHash());
+  history.replaceState({ tab: state.tab, season: state.season, daebun: state.daebun, sobun: state.sobun }, '', navHash());
   render();
   await loadData();
   render();
@@ -669,6 +704,7 @@ window.addEventListener('popstate', (e) => {
   const fromState = e.state;
   const parsed = fromState ? fromState : parseHash(location.hash);
   state.tab = parsed.tab || 'input';
+  state.season = parsed.season || null;
   state.daebun = parsed.daebun || null;
   state.sobun = parsed.sobun || null;
   render();

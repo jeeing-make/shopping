@@ -461,8 +461,8 @@ function renderInputForm(app) {
         if (idx >= 0) state.clothes[idx] = data;
         state.editingId = null;
       } else {
-        await postAction('saveClothing', data);
-        state.clothes.push(Object.assign({ '날짜': new Date().toISOString().slice(0, 10) }, data));
+        const result = await postAction('saveClothing', data);
+        state.clothes.push(Object.assign({ '날짜': new Date().toISOString().slice(0, 10), 'id': result && result.id }, data));
       }
       render();
     } catch (err) {
@@ -511,14 +511,14 @@ function renderHistory(app, fields) {
     const isUrl = /^https?:\/\//i.test(memo);
     let linkBlock = '';
     let memoBlock = '';
-    let linkHref = '';
+    let linkUrl = null;
     if (isUrl) {
       try {
         const host = new URL(memo).hostname.replace(/^www\./, '');
         const favicon = `https://www.google.com/s2/favicons?sz=64&domain=${host}`;
-        linkHref = memo;
+        linkUrl = memo;
         linkBlock = `
-          <button type="button" class="h-link" data-href="${encodeURI(memo)}">
+          <button type="button" class="h-link">
             <img src="${favicon}" alt="" />
             <span>${host}</span>
           </button>
@@ -545,11 +545,10 @@ function renderHistory(app, fields) {
     `;
 
     const linkEl = el.querySelector('.h-link');
-    if (linkEl) {
+    if (linkEl && linkUrl) {
       linkEl.onclick = () => {
-        const url = linkEl.dataset.href;
-        const w = window.open(url, '_blank', 'noopener');
-        if (!w) location.href = url;
+        const w = window.open(linkUrl, '_blank', 'noopener');
+        if (!w) location.href = linkUrl;
       };
     }
     el.querySelector('.h-edit').onclick = () => { state.editingId = it['id']; window.scrollTo(0, 0); render(); };
